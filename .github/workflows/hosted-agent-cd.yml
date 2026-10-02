@@ -14,3 +14,4 @@
         AZURE_AI_AGENT_ID: ${{ secrets.AZURE_AI_AGENT_ID }}
       run: |
         python test_agent.py
+# trigger run
