@@ -17,10 +17,10 @@ def test_agent_execution():
     credential = DefaultAzureCredential()
     
     # 2. Initialize the project client
-    project_client = AIProjectClient.from_connection_string(
-        credential=credential,
-        conn_str=connection_string
-    )
+project_client = AIProjectClient(
+    connection_string=connection_string,
+    credential=credential
+)
 
     try:
         print(f"🤖 Connecting to Agent ID: {agent_id}")
