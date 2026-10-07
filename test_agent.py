@@ -21,31 +21,35 @@ def test_agent_execution():
         credential=credential
     )
 
+    # 3. Extract the dedicated AgentsClient router to isolate method namespaces
+    # This bypasses the structural 'AgentsOperations' property tracking errors
+    agents_client = project_client.get_agents_client()
+
     try:
         print(f"🤖 Connecting to Agent ID: {agent_id}")
         
-        # 3. Create a communication thread using direct client namespace mapping
-        thread = project_client.agents.create_thread()
+        # 4. Create a thread using the standard nested namespace layout
+        thread = agents_client.threads.create()
         print(f"🧵 Created evaluation thread: {thread.id}")
 
-        # 4. Post a test message targeted at your Foundry IQ knowledge base
+        # 5. Post a test message targeted at your Foundry IQ knowledge base
         test_prompt = "Hello! Give me a 1-sentence confirmation that your Foundry IQ knowledge base is connected and working."
-        project_client.agents.create_message(
+        agents_client.messages.create(
             thread_id=thread.id,
             role="user",
             content=test_prompt
         )
 
-        # 5. Run the agent and wait for the processing to finish
+        # 6. Run the agent and wait for the processing to finish
         print("⏳ Running agent and waiting for response...")
-        run = project_client.agents.create_and_process_run(
+        run = agents_client.runs.create_and_process(
             thread_id=thread.id, 
             assistant_id=agent_id
         )
 
         if run.status == "completed":
-            # 6. Retrieve and validate the final answer
-            messages = project_client.agents.list_messages(thread_id=thread.id)
+            # 7. Retrieve and validate the final answer
+            messages = agents_client.messages.list(thread_id=thread.id)
             
             # The last message in the sequence is the agent's response
             last_message = messages.data
