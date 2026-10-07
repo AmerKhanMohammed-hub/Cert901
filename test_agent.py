@@ -24,13 +24,13 @@ def test_agent_execution():
     try:
         print(f"🤖 Connecting to Agent ID: {agent_id}")
         
-        # 3. Create a communication thread for the evaluation smoke test
-        thread = project_client.agents.create_thread()
+        # 3. Create a communication thread directly from the project client
+        thread = project_client.create_thread()
         print(f"🧵 Created evaluation thread: {thread.id}")
 
         # 4. Post a test message targeted at your Foundry IQ knowledge base
         test_prompt = "Hello! Give me a 1-sentence confirmation that your Foundry IQ knowledge base is connected and working."
-        project_client.agents.create_message(
+        project_client.create_message(
             thread_id=thread.id,
             role="user",
             content=test_prompt
@@ -38,14 +38,14 @@ def test_agent_execution():
 
         # 5. Run the agent and wait for the processing to finish
         print("⏳ Running agent and waiting for response...")
-        run = project_client.agents.create_and_process_run(
+        run = project_client.create_and_process_run(
             thread_id=thread.id, 
             assistant_id=agent_id
         )
 
         if run.status == "completed":
             # 6. Retrieve and validate the final answer
-            messages = project_client.agents.list_messages(thread_id=thread.id)
+            messages = project_client.list_messages(thread_id=thread.id)
             
             # The last message in the sequence is the agent's response
             last_message = messages.data
