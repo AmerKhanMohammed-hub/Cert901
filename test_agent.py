@@ -15,9 +15,9 @@ def test_agent_execution():
     print("🔐 Authenticating with Azure AI Foundry via OIDC/Default Identity...")
     credential = DefaultAzureCredential()
     
-    # 2. Initialize the project client using the modern initialization method
+    # 2. Initialize the project client using the mandatory endpoint argument
     project_client = AIProjectClient(
-        connection_string=connection_string,
+        endpoint=connection_string,
         credential=credential
     )
 
