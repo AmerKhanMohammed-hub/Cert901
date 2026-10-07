@@ -21,35 +21,31 @@ def test_agent_execution():
         credential=credential
     )
 
-    # 3. Extract the dedicated AgentsClient router to isolate method namespaces
-    # This bypasses the structural 'AgentsOperations' property tracking errors
-    agents_client = project_client.get_agents_client()
-
     try:
         print(f"🤖 Connecting to Agent ID: {agent_id}")
         
-        # 4. Create a thread using the standard nested namespace layout
-        thread = agents_client.threads.create()
+        # 3. Create a thread using standard CRUD .create() method
+        thread = project_client.agents.create_thread()
         print(f"🧵 Created evaluation thread: {thread.id}")
 
-        # 5. Post a test message targeted at your Foundry IQ knowledge base
+        # 4. Post a test message targeted at your Foundry IQ knowledge base
         test_prompt = "Hello! Give me a 1-sentence confirmation that your Foundry IQ knowledge base is connected and working."
-        agents_client.messages.create(
+        project_client.agents.create_message(
             thread_id=thread.id,
             role="user",
             content=test_prompt
         )
 
-        # 6. Run the agent and wait for the processing to finish
+        # 5. Run the agent and wait for the processing to finish using the standard direct method
         print("⏳ Running agent and waiting for response...")
-        run = agents_client.runs.create_and_process(
+        run = project_client.agents.create_and_process_run(
             thread_id=thread.id, 
             assistant_id=agent_id
         )
 
         if run.status == "completed":
-            # 7. Retrieve and validate the final answer
-            messages = agents_client.messages.list(thread_id=thread.id)
+            # 6. Retrieve and validate the final answer using standard .list_messages()
+            messages = project_client.agents.list_messages(thread_id=thread.id)
             
             # The last message in the sequence is the agent's response
             last_message = messages.data
