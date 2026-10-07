@@ -5,7 +5,6 @@ from azure.ai.projects import AIProjectClient
 
 def test_agent_execution():
     # 1. Fetch project connection details from environment variables
-    # Expected format: "eastus.api.azureml.ms;00000000-0000-0000-0000-000000000000;my-resource-group;my-ai-project"
     connection_string = os.getenv("AZURE_AIPROJECT_CONNECTION_STRING")
     agent_id = os.getenv("AZURE_AI_AGENT_ID")
 
@@ -16,11 +15,11 @@ def test_agent_execution():
     print("🔐 Authenticating with Azure AI Foundry via OIDC/Default Identity...")
     credential = DefaultAzureCredential()
     
-    # 2. Initialize the project client
-project_client = AIProjectClient(
-    connection_string=connection_string,
-    credential=credential
-)
+    # 2. Initialize the project client using the modern initialization method
+    project_client = AIProjectClient(
+        connection_string=connection_string,
+        credential=credential
+    )
 
     try:
         print(f"🤖 Connecting to Agent ID: {agent_id}")
@@ -49,7 +48,7 @@ project_client = AIProjectClient(
             messages = project_client.agents.list_messages(thread_id=thread.id)
             
             # The last message in the sequence is the agent's response
-            last_message = messages.data[0]
+            last_message = messages.data
             agent_response = "".join([text.text.value for text in last_message.content if hasattr(text, 'text')])
             
             print("\n🤖 [Agent Response]:")
