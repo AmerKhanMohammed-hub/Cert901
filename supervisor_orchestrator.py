@@ -2,13 +2,11 @@ import os
 import sys
 from azure.identity import DefaultAzureCredential
 from azure.ai.projects import AIProjectClient
-# Import standard built-in data tools from the core projects module
-from azure.ai.projects.models import CodeInterpreterTool
-# Multi-agent connection tools live inside the agents.models namespace
-from azure.ai.agents.models import ConnectedAgentTool
+# All agent tool bindings live inside the core projects models namespace
+from azure.ai.projects.models import AgentToolDefinition
 
 def execute_supervisor_workflow():
-    # 1. Fetch configuration properties from pipeline environment
+    # 1. Fetch project properties from environment variables
     project_endpoint = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
     supervisor_id = os.getenv("AZURE_AI_AGENT_ID")
 
@@ -32,14 +30,14 @@ def execute_supervisor_workflow():
         print(f"📦 Mapping Worker 1 (PDF Specialist): {worker_1_id}")
         print(f"📦 Mapping Worker 2 (India Researcher): {worker_2_id}")
 
-        # 4. Instantiate the tools using the correct ConnectedAgentTool constructor
-        worker_1_tool = ConnectedAgentTool(agent_id=worker_1_id)
-        worker_2_tool = ConnectedAgentTool(agent_id=worker_2_id)
+        # 4. Use AgentToolDefinition to build sub-agent tool objects natively
+        worker_1_tool = AgentToolDefinition(agent_id=worker_1_id)
+        worker_2_tool = AgentToolDefinition(agent_id=worker_2_id)
         orchestration_tools = [worker_1_tool, worker_2_tool]
 
         print(f"👑 Synchronising Master Supervisor Agent (ID: {supervisor_id})...")
         
-        # 5. Attach the sub-agent tools directly to the supervisor profile
+        # 5. Overwrite the supervisor configuration to inject your worker tools
         supervisor_agent = agent_client.update_agent(
             assistant_id=supervisor_id,
             tools=orchestration_tools
@@ -64,10 +62,10 @@ def execute_supervisor_workflow():
         run = agent_client.create_and_process_run(thread_id=thread.id, assistant_id=supervisor_id)
         print(f"🏁 Run execution finalized with Status: {run.status}")
 
-        # 8. Render the unified output
+        # 8. Render the unified output text
         messages = agent_client.list_messages(thread_id=thread.id)
         print("\n🏆 --- UNIFIED MULTI-AGENT RESPONSE --- 🏆\n")
-        print(messages.data[0].content[0].text.value)
+        print(messages.data.content.text.value)
         print("\n===========================================")
         sys.exit(0)
 
