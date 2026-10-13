@@ -4,46 +4,39 @@ from azure.identity import DefaultAzureCredential
 from azure.ai.projects import AIProjectClient
 
 def update_agent_system_prompt():
-    # 1. Fetch environment context
-    connection_string = os.getenv("AZURE_AIPROJECT_CONNECTION_STRING")
+    # 1. Fetch environment context using the Project Endpoint URL
+    project_endpoint = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
     agent_id = os.getenv("AZURE_AI_AGENT_ID")
 
-    if not connection_string or not agent_id:
-        print("❌ Error: Missing required environment variables.")
+    if not project_endpoint or not agent_id:
+        print("❌ Error: Missing required environment variables (AZURE_AI_PROJECT_ENDPOINT or AZURE_AI_AGENT_ID).")
         sys.exit(1)
 
     print("🔐 Authenticating with Azure Entra ID via OIDC...")
     credential = DefaultAzureCredential()
 
     try:
-        # 2. Establish connection to your AI Foundry project
-        project_client = AIProjectClient.from_connection_string(
-            credential=credential,
-            conn_str=connection_string
+        # 2. Modern Client Initialization: Pass endpoint directly into the constructor
+        project_client = AIProjectClient(
+            endpoint=project_endpoint,
+            credential=credential
         )
         agent_client = project_client.agents
         print("✅ Connected to Azure AI Foundry Project.")
 
-        # 3. Define your new, version-controlled system prompt
-        # You can update this text anytime inside GitHub to change your agent's behavior
+        # 3. Rest of your system prompt configuration...
         new_prompt = (
-            "You are an elite enterprise AI assistant optimized for the Cert 901 architecture. "
-            "You are natively connected to search-pilot-901 and knowledgebase839. "
-            "Always prioritize facts from the uploaded PDFs. Be concise, highly professional, "
-            "and format your responses with clean markdown lists."
+            "You are the master Orchestrator Agent. You do not have data tools or web tools of your own. "
+            "Instead, you supervise two expert worker agents to answer user requests."
         )
 
-        print(f"🔄 Fetching and updating agent ID: {agent_id}...")
-        
-        # 4. Push the update command to the Azure Control Plane
+        print(f"🔄 Updating agent ID: {agent_id}...")
         updated_agent = agent_client.update_agent(
             assistant_id=agent_id,
             instructions=new_prompt
         )
 
         print("🎉 Success! Agent system prompt programmatically updated in Foundry.")
-        print(f"🤖 Verified Agent ID: {updated_agent.id}")
-        print(f"📝 New Instructions Cached: '{updated_agent.instructions[:100]}...'")
         sys.exit(0)
 
     except Exception as e:
