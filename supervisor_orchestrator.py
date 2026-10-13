@@ -2,11 +2,13 @@ import os
 import sys
 from azure.identity import DefaultAzureCredential
 from azure.ai.projects import AIProjectClient
-# The correct SDK class name for cross-agent calling tools is AgentToolDefinition
-from azure.ai.projects.models import AgentToolDefinition
+# Import standard built-in data tools from the core projects module
+from azure.ai.projects.models import CodeInterpreterTool
+# Multi-agent connection tools live inside the agents.models namespace
+from azure.ai.agents.models import ConnectedAgentTool
 
 def execute_supervisor_workflow():
-    # 1. Fetch connection details
+    # 1. Fetch configuration properties from pipeline environment
     project_endpoint = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
     supervisor_id = os.getenv("AZURE_AI_AGENT_ID")
 
@@ -18,33 +20,33 @@ def execute_supervisor_workflow():
     credential = DefaultAzureCredential()
     
     try:
-        # 2. Establish project workspace connection
+        # 2. Instantiate central project client
         project_client = AIProjectClient(endpoint=project_endpoint, credential=credential)
         agent_client = project_client.agents
         print("✅ Connected to Microsoft Foundry Control Plane.")
 
-        # 3. Reference your active Worker IDs (Your verified Entra GUIDs)
+        # 3. Define Worker GUID strings (Your verified Entra IDs)
         worker_1_id = "88481e79-bfc1-4461-b317-fc5cf93168fd"  # PDF Data Specialist
         worker_2_id = "8b346c52-bc15-4727-a332-f0d5b1326cd3"  # India File Researcher
 
         print(f"📦 Mapping Worker 1 (PDF Specialist): {worker_1_id}")
         print(f"📦 Mapping Worker 2 (India Researcher): {worker_2_id}")
 
-        # 4. Use the correct AgentToolDefinition class to create tool bindings
-        worker_1_tool = AgentToolDefinition(agent_id=worker_1_id)
-        worker_2_tool = AgentToolDefinition(agent_id=worker_2_id)
+        # 4. Instantiate the tools using the correct ConnectedAgentTool constructor
+        worker_1_tool = ConnectedAgentTool(agent_id=worker_1_id)
+        worker_2_tool = ConnectedAgentTool(agent_id=worker_2_id)
         orchestration_tools = [worker_1_tool, worker_2_tool]
 
         print(f"👑 Synchronising Master Supervisor Agent (ID: {supervisor_id})...")
         
-        # 5. Overwrite the supervisor to ensure it actively holds the tool bindings
+        # 5. Attach the sub-agent tools directly to the supervisor profile
         supervisor_agent = agent_client.update_agent(
             assistant_id=supervisor_id,
             tools=orchestration_tools
         )
         print("👑 Supervisor agent successfully updated with active worker tools.")
 
-        # 6. Initialize a persistent conversation thread canvas
+        # 6. Initialize thread canvas and inject prompt
         print("🧵 Initialising execution thread...")
         thread = agent_client.create_thread()
 
@@ -57,12 +59,12 @@ def execute_supervisor_workflow():
         print(f"\n💬 Submitting Multi-Agent Query: '{mixed_prompt}'")
         agent_client.create_message(thread_id=thread.id, role="user", content=mixed_prompt)
 
-        # 7. Execute the multi-agent reasoning run
+        # 7. Execute the orchestrated run block
         print("⚙️ Processing Supervisor delegation loop...")
         run = agent_client.create_and_process_run(thread_id=thread.id, assistant_id=supervisor_id)
         print(f"🏁 Run execution finalized with Status: {run.status}")
 
-        # 8. Render the consolidated multi-agent response text
+        # 8. Render the unified output
         messages = agent_client.list_messages(thread_id=thread.id)
         print("\n🏆 --- UNIFIED MULTI-AGENT RESPONSE --- 🏆\n")
         print(messages.data[0].content[0].text.value)
