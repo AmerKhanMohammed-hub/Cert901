@@ -2,67 +2,76 @@ import os
 import sys
 from azure.identity import DefaultAzureCredential
 from azure.ai.projects import AIProjectClient
-from azure.ai.projects.models import ConnectedAgentToolDefinition
+# The correct SDK class name for cross-agent calling tools is AgentToolDefinition
+from azure.ai.projects.models import AgentToolDefinition
 
 def execute_supervisor_workflow():
+    # 1. Fetch connection details
     project_endpoint = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
-    if not project_endpoint:
-        print("❌ Error: Missing AZURE_AI_PROJECT_ENDPOINT environment variable.")
+    supervisor_id = os.getenv("AZURE_AI_AGENT_ID")
+
+    if not project_endpoint or not supervisor_id:
+        print("❌ Error: Missing required environment variables (AZURE_AI_PROJECT_ENDPOINT or AZURE_AI_AGENT_ID).")
         sys.exit(1)
 
     print("🔐 Authenticating identity via secure cloud credential bridge...")
     credential = DefaultAzureCredential()
     
-    project_client = AIProjectClient(endpoint=project_endpoint, credential=credential)
-    agent_client = project_client.agents
-    print("✅ Connected to Microsoft Foundry Control Plane.")
+    try:
+        # 2. Establish project workspace connection
+        project_client = AIProjectClient(endpoint=project_endpoint, credential=credential)
+        agent_client = project_client.agents
+        print("✅ Connected to Microsoft Foundry Control Plane.")
 
-    worker_1_id = "88481e79-bfc1-4461-b317-fc5cf93168fd"  # PDF Data Specialist
-    worker_2_id = "8b346c52-bc15-4727-a332-f0d5b1326cd3"  # India File Researcher
+        # 3. Reference your active Worker IDs (Your verified Entra GUIDs)
+        worker_1_id = "88481e79-bfc1-4461-b317-fc5cf93168fd"  # PDF Data Specialist
+        worker_2_id = "8b346c52-bc15-4727-a332-f0d5b1326cd3"  # India File Researcher
 
-    print(f"📦 Mapping Worker 1 (PDF Specialist): {worker_1_id}")
-    print(f"📦 Mapping Worker 2 (India Researcher): {worker_2_id}")
+        print(f"📦 Mapping Worker 1 (PDF Specialist): {worker_1_id}")
+        print(f"📦 Mapping Worker 2 (India Researcher): {worker_2_id}")
 
-    worker_1_tool = ConnectedAgentToolDefinition(agent_id=worker_1_id)
-    worker_2_tool = ConnectedAgentToolDefinition(agent_id=worker_2_id)
-    orchestration_tools = [worker_1_tool, worker_2_tool]
+        # 4. Use the correct AgentToolDefinition class to create tool bindings
+        worker_1_tool = AgentToolDefinition(agent_id=worker_1_id)
+        worker_2_tool = AgentToolDefinition(agent_id=worker_2_id)
+        orchestration_tools = [worker_1_tool, worker_2_tool]
 
-    print("👑 Provisioning the Master Masonic Supervisor Agent with routing paths...")
-    
-    supervisor_agent = agent_client.create_agent(
-        model="gpt-5-mini",
-        name="Masonic-Ecosystem-Supervisor",
-        instructions=(
-            "You are the master Orchestrator Agent. You do not have data tools or web tools of your own. "
-            "Instead, you supervise two expert workers to answer user requests.\n\n"
-            "Your routing paths are explicitly defined:\n"
-            "- For historical dining slip data or menus, trigger your tool for Worker 88481e79-bfc1-4461-b317-fc5cf93168fd.\n"
-            "- For regional details about Freemason Lodges in India, trigger your tool for Worker 8b346c52-bc15-4727-a332-f0d5b1326cd3.\n\n"
-            "Analyze the incoming query, call the correct sequence of tools to gather outputs, "
-            "and synthesize a clean markdown comparison for the user."
-        ),
-        tools=orchestration_tools
-    )
-    print(f"👑 Supervisor successfully initialized (ID: {supervisor_agent.id})")
+        print(f"👑 Synchronising Master Supervisor Agent (ID: {supervisor_id})...")
+        
+        # 5. Overwrite the supervisor to ensure it actively holds the tool bindings
+        supervisor_agent = agent_client.update_agent(
+            assistant_id=supervisor_id,
+            tools=orchestration_tools
+        )
+        print("👑 Supervisor agent successfully updated with active worker tools.")
 
-    thread = agent_client.create_thread()
-    mixed_prompt = (
-        "Compare the historical menu items found on our Masonic dining slip PDF with the "
-        "regional data parameters for active Freemason Lodges currently operating in Mumbai or New Delhi. "
-        "Coordinate with both workers to provide a single, unified breakdown."
-    )
-    
-    print(f"\n💬 Submitting Multi-Agent Query: '{mixed_prompt}'")
-    agent_client.create_message(thread_id=thread.id, role="user", content=mixed_prompt)
+        # 6. Initialize a persistent conversation thread canvas
+        print("🧵 Initialising execution thread...")
+        thread = agent_client.create_thread()
 
-    print("⚙️ Processing Supervisor delegation and tool-calling states...")
-    run = agent_client.create_and_process_run(thread_id=thread.id, assistant_id=supervisor_agent.id)
-    print(f"🏁 Run execution finalized with Status: {run.status}")
+        mixed_prompt = (
+            "Compare the historical menu items found on our Masonic dining slip PDF with the "
+            "regional data parameters for active Freemason Lodges currently operating in Mumbai or New Delhi. "
+            "Coordinate with both workers to provide a single, unified breakdown."
+        )
+        
+        print(f"\n💬 Submitting Multi-Agent Query: '{mixed_prompt}'")
+        agent_client.create_message(thread_id=thread.id, role="user", content=mixed_prompt)
 
-    messages = agent_client.list_messages(thread_id=thread.id)
-    print("\n🏆 --- UNIFIED MULTI-AGENT RESPONSE --- 🏆\n")
-    print(messages.data.content.text.value)
-    print("\n===========================================")
+        # 7. Execute the multi-agent reasoning run
+        print("⚙️ Processing Supervisor delegation loop...")
+        run = agent_client.create_and_process_run(thread_id=thread.id, assistant_id=supervisor_id)
+        print(f"🏁 Run execution finalized with Status: {run.status}")
+
+        # 8. Render the consolidated multi-agent response text
+        messages = agent_client.list_messages(thread_id=thread.id)
+        print("\n🏆 --- UNIFIED MULTI-AGENT RESPONSE --- 🏆\n")
+        print(messages.data[0].content[0].text.value)
+        print("\n===========================================")
+        sys.exit(0)
+
+    except Exception as e:
+        print(f"❌ Execution Failure: {str(e)}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     execute_supervisor_workflow()
