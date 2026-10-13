@@ -5,6 +5,7 @@ from azure.ai.projects import AIProjectClient
 from azure.ai.projects.models import PromptAgentDefinition
 
 def update_agent_system_prompt():
+    # 1. Fetch environment context variables
     project_endpoint = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
     agent_id = os.getenv("AZURE_AI_AGENT_ID")
 
@@ -16,6 +17,7 @@ def update_agent_system_prompt():
     credential = DefaultAzureCredential()
 
     try:
+        # 2. Modern initialization via client constructor
         project_client = AIProjectClient(
             endpoint=project_endpoint,
             credential=credential
@@ -23,13 +25,15 @@ def update_agent_system_prompt():
         agent_client = project_client.agents
         print("✅ Connected to Azure AI Foundry Project.")
 
+        # 3. Define version-controlled system prompt
         new_instructions = (
             "You are the master Orchestrator Agent. You do not have data tools or web tools of your own. "
             "Instead, you supervise two expert worker agents to answer user requests."
         )
 
-        print(f"🔄 Creating a brand new version configuration for Agent ID: {agent_id}...")
+        print(f"🔄 Deploying new immutable prompt configuration for Agent ID: {agent_id}...")
         
+        # 4. Create version block using PromptAgentDefinition descriptor
         updated_agent = agent_client.create_version(
             agent_name="Masonic-Ecosystem-Supervisor",
             definition=PromptAgentDefinition(
