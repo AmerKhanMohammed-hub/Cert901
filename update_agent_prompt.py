@@ -2,9 +2,9 @@ import os
 import sys
 from azure.identity import DefaultAzureCredential
 from azure.ai.projects import AIProjectClient
+from azure.ai.projects.models import PromptAgentDefinition  # <-- New class import
 
 def update_agent_system_prompt():
-    # 1. Fetch environment context using the Project Endpoint URL
     project_endpoint = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
     agent_id = os.getenv("AZURE_AI_AGENT_ID")
 
@@ -16,7 +16,6 @@ def update_agent_system_prompt():
     credential = DefaultAzureCredential()
 
     try:
-        # 2. Modern Client Initialization: Pass endpoint directly into the constructor
         project_client = AIProjectClient(
             endpoint=project_endpoint,
             credential=credential
@@ -24,19 +23,25 @@ def update_agent_system_prompt():
         agent_client = project_client.agents
         print("✅ Connected to Azure AI Foundry Project.")
 
-        # 3. Rest of your system prompt configuration...
-        new_prompt = (
+        # 1. Define your new system instructions
+        new_instructions = (
             "You are the master Orchestrator Agent. You do not have data tools or web tools of your own. "
             "Instead, you supervise two expert worker agents to answer user requests."
         )
 
-        print(f"🔄 Updating agent ID: {agent_id}...")
-        updated_agent = agent_client.update_agent(
-            assistant_id=agent_id,
-            instructions=new_prompt
+        print(f"🔄 Creating a brand new version configuration for Agent ID: {agent_id}...")
+        
+        # 2. Invoke the version-control immutable standard
+        updated_agent = agent_client.create_version(
+            agent_name="Masonic-Ecosystem-Supervisor",
+            definition=PromptAgentDefinition(
+                model="gpt-5-mini",
+                instructions=new_instructions
+            )
         )
 
-        print("🎉 Success! Agent system prompt programmatically updated in Foundry.")
+        print("🎉 Success! A new immutable agent prompt version was programmatically deployed to Foundry.")
+        print(f"🤖 New Version Active ID: {updated_agent.id}")
         sys.exit(0)
 
     except Exception as e:
