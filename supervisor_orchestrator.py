@@ -27,10 +27,11 @@ def execute_supervisor_workflow():
         project_client = AIProjectClient(endpoint=project_endpoint, credential=credential)
         print("✅ Connected to Microsoft Foundry Control Plane.")
 
-        # Define function tool metadata so the Supervisor model knows how to call them
+        # Define function tool metadata with mandatory structural name fields at both levels
         tools_definition = [
             {
                 "type": "function",
+                "name": "call_pdf_data_specialist_worker",  # MANDATORY field to pass API payload validation
                 "function": {
                     "name": "call_pdf_data_specialist_worker",
                     "description": "Queries the historical Data Specialist Worker to extract facts from historical Masonic dining slips and menus.",
@@ -45,6 +46,7 @@ def execute_supervisor_workflow():
             },
             {
                 "type": "function",
+                "name": "call_india_file_researcher_worker",  # MANDATORY field to pass API payload validation
                 "function": {
                     "name": "call_india_file_researcher_worker",
                     "description": "Queries the India File Researcher Worker to read local files and pull active lodge addresses for New Delhi.",
@@ -60,7 +62,7 @@ def execute_supervisor_workflow():
         ]
 
         print(f"👑 Attaching dynamic routing function capabilities to Supervisor via Immutable Versioning...")
-        # Fixed placement: pass the name parameter to create_version, not inside PromptAgentDefinition
+        # Deploy version configuration using corrected schema mappings
         project_client.agents.create_version(
             agent_name="Masonic-Ecosystem-Supervisor",
             definition=PromptAgentDefinition(
@@ -121,7 +123,6 @@ def execute_supervisor_workflow():
                             # Execute an isolated sub-run directly against the designated worker agent
                             sub_thread = openai_client.beta.threads.create()
                             
-                            # Determine payload input parameter strings
                             worker_query = arguments.get("query") or arguments.get("city") or "Extract structural data targets."
                             
                             openai_client.beta.threads.messages.create(
