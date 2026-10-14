@@ -4,7 +4,6 @@ from azure.identity import DefaultAzureCredential
 from azure.ai.projects import AIProjectClient
 
 def execute_supervisor_workflow():
-    # 1. Fetch project environment context
     project_endpoint = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
     supervisor_id = os.getenv("AZURE_AI_AGENT_ID")
 
@@ -16,56 +15,51 @@ def execute_supervisor_workflow():
     credential = DefaultAzureCredential()
     
     try:
-        # 2. Establish connection to your central project hub
         project_client = AIProjectClient(endpoint=project_endpoint, credential=credential)
         print("✅ Connected to Microsoft Foundry Control Plane.")
 
-        # 3. Reference your verified data worker GUID entries
+        # Reference your target worker GUID entries
         pdf_worker_id = "88481e79-bfc1-4461-b317-fc5cf93168fd"
         india_worker_id = "8b346c52-bc15-4727-a332-f0d5b1326cd3"
 
-        print("💬 Initialising a fresh multi-agent session using the modern Responses API...")
+        print("💬 Initialising a fresh multi-agent session using the stable Responses API...")
         
-        # 4. In the updated SDK, get_openai_client() returns the unified Responses client
         with project_client.get_openai_client() as openai_client:
             
             # --- Step 1: Query PDF Data Specialist Worker ---
             print(f"➡️ Step 1: Invoking PDF Data Specialist (ID: {pdf_worker_id})...")
-            w1_conversation = openai_client.conversations.create(
-                items=[{
-                    "type": "message",
-                    "role": "user",
-                    "content": "Extract historical dining slip menu items from your attached knowledge base."
-                }]
-            )
             w1_response = openai_client.responses.create(
-                conversation_id=w1_conversation.id,
-                agent_reference={"id": pdf_worker_id}
+                model="gpt-5-mini",
+                input="Extract historical dining slip menu items from your attached knowledge base.",
+                extra_body={
+                    "agent_reference": {
+                        "id": pdf_worker_id,
+                        "type": "agent_reference"
+                    }
+                }
             )
-            # Safely extract the worker's textual feedback payload
-            w1_text = w1_response.choices[0].message.content
+            # Access text via output tracking structure
+            w1_text = getattr(w1_response, "output_text", str(w1_response))
             print("   [Worker 1 Data Retrieved Successfully]")
 
             # --- Step 2: Query India File Researcher Worker ---
             print(f"➡️ Step 2: Invoking India File Researcher (ID: {india_worker_id})...")
-            w2_conversation = openai_client.conversations.create(
-                items=[{
-                    "type": "message",
-                    "role": "user",
-                    "content": "Fetch active lodge address details for New Delhi from your lodges data asset."
-                }]
-            )
             w2_response = openai_client.responses.create(
-                conversation_id=w2_conversation.id,
-                agent_reference={"id": india_worker_id}
+                model="gpt-5-mini",
+                input="Fetch active lodge address details for New Delhi from your lodges data asset.",
+                extra_body={
+                    "agent_reference": {
+                        "id": india_worker_id,
+                        "type": "agent_reference"
+                    }
+                }
             )
-            w2_text = w2_response.choices[0].message.content
+            w2_text = getattr(w2_response, "output_text", str(w2_response))
             print("   [Worker 2 Data Retrieved Successfully]")
 
             # --- Step 3: Invoke Master Supervisor for Final Consolidation ---
             print(f"👑 Step 3: Driving Master Supervisor (ID: {supervisor_id}) for synthesis...")
             
-            # Package both gathered datasets into a single orchestrated request prompt context
             synthesis_prompt = (
                 f"You are the master orchestrator. Review the data parameters gathered below:\n\n"
                 f"DATASET 1 (Historical Menu): {w1_text}\n\n"
@@ -73,21 +67,19 @@ def execute_supervisor_workflow():
                 f"Compare these datasets and compile a clean, unified markdown review list for the user."
             )
             
-            supervisor_conversation = openai_client.conversations.create(
-                items=[{
-                    "type": "message",
-                    "role": "user",
-                    "content": synthesis_prompt
-                }]
-            )
-            
             final_response = openai_client.responses.create(
-                conversation_id=supervisor_conversation.id,
-                agent_reference={"id": supervisor_id}
+                model="gpt-5-mini",
+                input=synthesis_prompt,
+                extra_body={
+                    "agent_reference": {
+                        "id": supervisor_id,
+                        "type": "agent_reference"
+                    }
+                }
             )
 
             print("\n🏆 --- UNIFIED MULTI-AGENT RESPONSE --- 🏆\n")
-            print(final_response.choices[0].message.content)
+            print(getattr(final_response, "output_text", str(final_response)))
             print("\n===========================================")
             
         sys.exit(0)
