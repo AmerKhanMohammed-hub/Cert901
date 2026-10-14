@@ -34,11 +34,12 @@ def execute_supervisor_workflow():
                 extra_body={
                     "agent_reference": {
                         "id": pdf_worker_id,
+                        "name": "orange-agent-nfn0jysq17",  # Required field to pass API payload verification
                         "type": "agent_reference"
                     }
                 }
             )
-            # Access text via output tracking structure
+            # Safely extract text string from production object schema
             w1_text = getattr(w1_response, "output_text", str(w1_response))
             print("   [Worker 1 Data Retrieved Successfully]")
 
@@ -50,6 +51,7 @@ def execute_supervisor_workflow():
                 extra_body={
                     "agent_reference": {
                         "id": india_worker_id,
+                        "name": "India-Lodge-Research-Worker",  # Required field to pass API payload verification
                         "type": "agent_reference"
                     }
                 }
@@ -73,6 +75,7 @@ def execute_supervisor_workflow():
                 extra_body={
                     "agent_reference": {
                         "id": supervisor_id,
+                        "name": "Masonic-Ecosystem-Supervisor",  # Required field to pass API payload verification
                         "type": "agent_reference"
                     }
                 }
