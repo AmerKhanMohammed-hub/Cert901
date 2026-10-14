@@ -60,10 +60,11 @@ def execute_supervisor_workflow():
         ]
 
         print(f"👑 Attaching dynamic routing function capabilities to Supervisor via Immutable Versioning...")
-        # Production syntax maps agent structural updates through create_version
+        # Satisfy payload constraints by providing 'name' in both the parameter and inside the definition
         project_client.agents.create_version(
             agent_name="Masonic-Ecosystem-Supervisor",
             definition=PromptAgentDefinition(
+                name="Masonic-Ecosystem-Supervisor",  # Required field inside definition to clear validation block
                 model="gpt-5-mini",
                 instructions=(
                     "You are the master Orchestrator Supervisor Agent. You delegate tasks to your specialized workers "
@@ -139,7 +140,7 @@ def execute_supervisor_workflow():
                             # Safely parse text block content values from response arrays
                             worker_output = "No data payload returned."
                             if worker_messages.data:
-                                latest_msg = worker_messages.data[0]
+                                latest_msg = worker_messages.data[0] # Grab the first entry element
                                 if latest_msg.content and hasattr(latest_msg.content[0], 'text'):
                                     worker_output = latest_msg.content[0].text.value
                             
@@ -173,4 +174,4 @@ def execute_supervisor_workflow():
         sys.exit(1)
 
 if __name__ == "__main__":
-    execute_workflow = execute_supervisor_workflow()
+    execute_supervisor_workflow()
