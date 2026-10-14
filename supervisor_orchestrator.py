@@ -15,8 +15,8 @@ def execute_supervisor_workflow():
     credential = DefaultAzureCredential()
     
     try:
+        # Connect directly to the main project hub
         project_client = AIProjectClient(endpoint=project_endpoint, credential=credential)
-        agent_client = project_client.agents
         print("✅ Connected to Microsoft Foundry Control Plane.")
 
         # 1. Store your worker GUID entries (Your verified Entra IDs)
@@ -24,28 +24,28 @@ def execute_supervisor_workflow():
         india_worker_id = "8b346c52-bc15-4727-a332-f0d5b1326cd3"
 
         print("🧵 Initialising a fresh multi-agent execution thread canvas...")
-        # Production syntax maps explicitly through the .threads collection
-        thread = agent_client.threads.create()
+        # In the stable production SDK, thread and run methods are called directly on project_client
+        thread = project_client.create_thread()
         print(f"   [Thread successfully created: {thread.id}]")
 
         # 2. Sequential Worker 1 Run: Pull historical menu contexts
         print("➡️ Step 1: Querying PDF Data Specialist...")
-        agent_client.messages.create(
+        project_client.create_message(
             thread_id=thread.id, 
             role="user", 
             content="Extract historical dining slip menu items from your attached knowledge base."
         )
-        run_w1 = agent_client.runs.create_and_process(thread_id=thread.id, agent_id=pdf_worker_id)
+        run_w1 = project_client.create_and_process_run(thread_id=thread.id, assistant_id=pdf_worker_id)
         print(f"   [Worker 1 Finalized with status: {run_w1.status}]")
 
         # 3. Sequential Worker 2 Run: Pull modern lodge parameters
         print("➡️ Step 2: Querying India File Researcher...")
-        agent_client.messages.create(
+        project_client.create_message(
             thread_id=thread.id, 
             role="user", 
             content="Fetch active lodge address details for New Delhi from your lodges data asset."
         )
-        run_w2 = agent_client.runs.create_and_process(thread_id=thread.id, agent_id=india_worker_id)
+        run_w2 = project_client.create_and_process_run(thread_id=thread.id, assistant_id=india_worker_id)
         print(f"   [Worker 2 Finalized with status: {run_w2.status}]")
 
         # 4. Final Supervisor Synthesis Run
@@ -55,20 +55,26 @@ def execute_supervisor_workflow():
             "and the active New Delhi lodge parameters from Worker 2. Compare the datasets and "
             "synthesize a single, unified markdown review list for the user."
         )
-        agent_client.messages.create(thread_id=thread.id, role="user", content=synthesis_prompt)
+        project_client.create_message(thread_id=thread.id, role="user", content=synthesis_prompt)
         
-        run_supervisor = agent_client.runs.create_and_process(thread_id=thread.id, agent_id=supervisor_id)
+        run_supervisor = project_client.create_and_process_run(thread_id=thread.id, assistant_id=supervisor_id)
         print(f"🏁 Run execution finalized with Status: {run_supervisor.status}")
 
         # 5. Extract and print the final supervisor message text
-        messages = agent_client.messages.list(thread_id=thread.id)
+        messages = project_client.list_messages(thread_id=thread.id)
         print("\n🏆 --- UNIFIED MULTI-AGENT RESPONSE --- 🏆\n")
         
-        # Traverse messages list to display content safely
-        for msg in reversed(list(messages.data)):
-            if msg.role == "assistant" and msg.agent_id == supervisor_id:
-                print(msg.content[0].text.value)
-                break
+        # Display the response text from the supervisor run
+        if hasattr(messages, 'data') and messages.data:
+            latest_msg = messages.data[0]
+            if hasattr(latest_msg, 'content') and latest_msg.content:
+                # Handle text format variations in response payload
+                if hasattr(latest_msg.content, 'text'):
+                    print(latest_msg.content.text.value)
+                elif isinstance(latest_msg.content, list) and hasattr(latest_msg.content[0], 'text'):
+                    print(latest_msg.content[0].text.value)
+                else:
+                    print(latest_msg.content)
                 
         print("\n===========================================")
         sys.exit(0)
