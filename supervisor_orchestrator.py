@@ -5,7 +5,7 @@ from azure.identity import DefaultAzureCredential
 from azure.ai.projects import AIProjectClient
 from azure.ai.projects.models import PromptAgentDefinition
 
-# Hardcoded reference to your verified cloud worker GUID entries
+# Hardcoded reference mapping to your verified worker GUID entries
 WORKER_MAP = {
     "call_pdf_data_specialist_worker": "88481e79-bfc1-4461-b317-fc5cf93168fd",
     "call_india_file_researcher_worker": "8b346c52-bc15-4727-a332-f0d5b1326cd3"
@@ -23,15 +23,15 @@ def execute_supervisor_workflow():
     credential = DefaultAzureCredential()
     
     try:
-        # 1. Initialize the main project client
+        # 1. Establish connection to your central project hub
         project_client = AIProjectClient(endpoint=project_endpoint, credential=credential)
         print("✅ Connected to Microsoft Foundry Control Plane.")
 
-        # Define function tool metadata with mandatory structural name fields at both levels
+        # 2. Define the schema tools matching modern payload standards
         tools_definition = [
             {
                 "type": "function",
-                "name": "call_pdf_data_specialist_worker",  # MANDATORY field to pass API payload validation
+                "name": "call_pdf_data_specialist_worker",
                 "function": {
                     "name": "call_pdf_data_specialist_worker",
                     "description": "Queries the historical Data Specialist Worker to extract facts from historical Masonic dining slips and menus.",
@@ -46,7 +46,7 @@ def execute_supervisor_workflow():
             },
             {
                 "type": "function",
-                "name": "call_india_file_researcher_worker",  # MANDATORY field to pass API payload validation
+                "name": "call_india_file_researcher_worker",
                 "function": {
                     "name": "call_india_file_researcher_worker",
                     "description": "Queries the India File Researcher Worker to read local files and pull active lodge addresses for New Delhi.",
@@ -61,8 +61,7 @@ def execute_supervisor_workflow():
             }
         ]
 
-        print(f"👑 Attaching dynamic routing function capabilities to Supervisor via Immutable Versioning...")
-        # Deploy version configuration using corrected schema mappings
+        print("👑 Synchronizing Master Supervisor Agent with function calling schemas...")
         project_client.agents.create_version(
             agent_name="Masonic-Ecosystem-Supervisor",
             definition=PromptAgentDefinition(
@@ -75,96 +74,86 @@ def execute_supervisor_workflow():
                 tools=tools_definition
             )
         )
-        print("👑 Supervisor agent template successfully synchronized with runtime function schemas.")
 
-        # 2. Enter the OpenAI execution layer for threads and routing loops
+        # 3. Enter the unified Responses API interaction context
+        print("💬 Initialising multi-agent session using the modern Responses API...")
         with project_client.get_openai_client() as openai_client:
-            print("🧵 Initialising multi-agent interaction thread...")
-            thread = openai_client.beta.threads.create()
-
+            
             mixed_prompt = (
                 "Compare the historical menu items found on our Masonic dining slip PDF with the "
                 "regional data parameters for active Freemason Lodges currently operating in New Delhi. "
                 "Coordinate with your workers to provide a single, unified breakdown."
             )
             print(f"\n💬 Submitting Multi-Agent Query: '{mixed_prompt}'")
-            openai_client.beta.threads.messages.create(
-                thread_id=thread.id, role="user", content=mixed_prompt
+            
+            # Create a conversations thread via modern data-plane routing
+            conversation = openai_client.conversations.create(
+                items=[{"type": "message", "role": "user", "content": mixed_prompt}]
+            )
+            
+            # --- INITIAL SUPERVISOR CALL ---
+            print("⚙️ Driving Master Supervisor to analyze request intent...")
+            response = openai_client.responses.create(
+                conversation_id=conversation.id,
+                agent_reference={
+                    "id": supervisor_id,
+                    "name": "Masonic-Ecosystem-Supervisor",
+                    "type": "agent_reference"
+                }
             )
 
-            # Create the initial run execution
-            run = openai_client.beta.threads.runs.create(
-                thread_id=thread.id, assistant_id=supervisor_id
-            )
-
-            # --- THE DYNAMIC ORCHESTRATION LOOP ---
-            print("⚙️ Entering Autonomous Supervisor Delegation Loop...")
-            while True:
-                # Poll the run status
-                run_status = openai_client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
+            # --- DYNAMIC INTERCEPT TOOL LOOP ---
+            # If the supervisor requests tools, status evaluates to 'requires_action'
+            if getattr(response, "status", "") == "requires_action" or hasattr(response, "required_action"):
+                print("\n👑 [SUPERVISOR ACTION]: Supervisor is dynamically calling a worker agent...")
+                tool_outputs = []
                 
-                if run_status.status == "completed":
-                    print("🏁 Supervisor has finished consolidation!")
-                    break
-                
-                elif run_status.status == "requires_action":
-                    print("\n👑 [SUPERVISOR ACTION]: Supervisor is dynamically calling a worker agent...")
-                    tool_outputs = []
+                # Iterate through tool actions requested by the LLM
+                tool_calls = response.required_action.submit_tool_outputs.tool_calls
+                for tool_call in tool_calls:
+                    function_name = tool_call.function.name
+                    arguments = json.loads(tool_call.function.arguments)
                     
-                    # Intercept the worker calls requested by the Supervisor model
-                    for tool_call in run_status.required_action.submit_tool_outputs.tool_calls:
-                        function_name = tool_call.function.name
-                        arguments = json.loads(tool_call.function.arguments)
+                    if function_name in WORKER_MAP:
+                        target_worker_id = WORKER_MAP[function_name]
+                        worker_query = arguments.get("query") or arguments.get("city") or "Process data parameters."
                         
-                        if function_name in WORKER_MAP:
-                            target_worker_id = WORKER_MAP[function_name]
-                            print(f"   ➡️ Triggering Worker GUID: {target_worker_id} via sub-thread execution...")
-                            
-                            # Execute an isolated sub-run directly against the designated worker agent
-                            sub_thread = openai_client.beta.threads.create()
-                            
-                            worker_query = arguments.get("query") or arguments.get("city") or "Extract structural data targets."
-                            
-                            openai_client.beta.threads.messages.create(
-                                thread_id=sub_thread.id, 
-                                role="user", 
-                                content=worker_query
-                            )
-                            sub_run = openai_client.beta.threads.runs.create_and_poll(
-                                thread_id=sub_thread.id, assistant_id=target_worker_id
-                            )
-                            
-                            # Fetch what the worker found in its database
-                            worker_messages = openai_client.beta.threads.messages.list(thread_id=sub_thread.id)
-                            
-                            # Safely parse text block content values from response arrays
-                            worker_output = "No data payload returned."
-                            if worker_messages.data:
-                                latest_msg = worker_messages.data
-                                if latest_msg.content and hasattr(latest_msg.content, 'text'):
-                                    worker_output = latest_msg.content.text.value
-                            
-                            print(f"   👤 [WORKER RESPONSE]: Captured payload data successfully.")
-                            
-                            tool_outputs.append({
-                                "tool_call_id": tool_call.id,
-                                "output": worker_output
-                            })
-                    
-                    # Submit the worker results back up to the Supervisor
-                    openai_client.beta.threads.runs.submit_tool_outputs(
-                        thread_id=thread.id, run_id=run.id, tool_outputs=tool_outputs
-                    )
+                        print(f"   ➡️ Triggering Worker GUID: {target_worker_id} dynamically...")
+                        
+                        # Execute a synchronous data request directly against the targeted sub-worker
+                        worker_response = openai_client.responses.create(
+                            model="gpt-5-mini",
+                            input=worker_query,
+                            extra_body={
+                                "agent_reference": {
+                                    "id": target_worker_id,
+                                    "name": "Masonic-Worker-Node",
+                                    "type": "agent_reference"
+                                }
+                            }
+                        )
+                        worker_text = getattr(worker_response, "output_text", str(worker_response))
+                        print(f"   👤 [WORKER RESPONSE]: Extracted payload data successfully.")
+                        
+                        tool_outputs.append({
+                            "tool_call_id": tool_call.id,
+                            "output": worker_text
+                        })
                 
-                elif run_status.status in ["failed", "cancelled", "expired"]:
-                    print(f"❌ Run failed with status: {run_status.status}")
-                    sys.exit(1)
+                print("👑 Submitting worker payloads back to Supervisor for final synthesis...")
+                # Submit tool outputs back into the exact same conversation context
+                response = openai_client.responses.create(
+                    conversation_id=conversation.id,
+                    agent_reference={
+                        "id": supervisor_id,
+                        "name": "Masonic-Ecosystem-Supervisor",
+                        "type": "agent_reference"
+                    },
+                    tool_outputs=tool_outputs
+                )
 
-            # --- DISPLAY FINAL SYNTHESIS ---
-            messages = openai_client.beta.threads.messages.list(thread_id=thread.id)
             print("\n🏆 --- UNIFIED MULTI-AGENT SYNTHESIS RESPONSE --- 🏆\n")
-            if messages.data:
-                print(messages.data.content.text.value)
+            print(getattr(response, "output_text", response.choices.message.content if hasattr(response, 'choices') else str(response)))
             print("\n===========================================")
             
         sys.exit(0)
