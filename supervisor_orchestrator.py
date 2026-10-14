@@ -86,30 +86,27 @@ def execute_supervisor_workflow():
             )
             print(f"\n💬 Submitting Multi-Agent Query: '{mixed_prompt}'")
             
-            # Create a conversations thread via modern data-plane routing
-            conversation = openai_client.conversations.create(
-                items=[{"type": "message", "role": "user", "content": mixed_prompt}]
-            )
-            
             # --- INITIAL SUPERVISOR CALL ---
             print("⚙️ Driving Master Supervisor to analyze request intent...")
             response = openai_client.responses.create(
-                conversation_id=conversation.id,
-                agent_reference={
-                    "id": supervisor_id,
-                    "name": "Masonic-Ecosystem-Supervisor",
-                    "type": "agent_reference"
+                model="gpt-5-mini",
+                input=mixed_prompt,
+                extra_body={
+                    "agent_reference": {
+                        "id": supervisor_id,
+                        "name": "Masonic-Ecosystem-Supervisor",
+                        "type": "agent_reference"
+                    }
                 }
             )
 
             # --- DYNAMIC INTERCEPT TOOL LOOP ---
-            # If the supervisor requests tools, status evaluates to 'requires_action'
-            if getattr(response, "status", "") == "requires_action" or hasattr(response, "required_action"):
-                print("\n👑 [SUPERVISOR ACTION]: Supervisor is dynamically calling a worker agent...")
+            # Under the modern Responses API, function calls manifest in the choices payload block
+            if hasattr(response, "choices") and response.choices and getattr(response.choices[0].finish_reason, "str", "") == "tool_calls":
+                print("\n👑 [SUPERVISOR ACTION]: Supervisor model has autonomously decided to trigger its workers!")
                 tool_outputs = []
                 
-                # Iterate through tool actions requested by the LLM
-                tool_calls = response.required_action.submit_tool_outputs.tool_calls
+                tool_calls = response.choices[0].message.tool_calls
                 for tool_call in tool_calls:
                     function_name = tool_call.function.name
                     arguments = json.loads(tool_call.function.arguments)
@@ -118,7 +115,7 @@ def execute_supervisor_workflow():
                         target_worker_id = WORKER_MAP[function_name]
                         worker_query = arguments.get("query") or arguments.get("city") or "Process data parameters."
                         
-                        print(f"   ➡️ Triggering Worker GUID: {target_worker_id} dynamically...")
+                        print(f"   ➡️ Automatically routing task to Worker GUID: {target_worker_id}...")
                         
                         # Execute a synchronous data request directly against the targeted sub-worker
                         worker_response = openai_client.responses.create(
@@ -141,19 +138,22 @@ def execute_supervisor_workflow():
                         })
                 
                 print("👑 Submitting worker payloads back to Supervisor for final synthesis...")
-                # Submit tool outputs back into the exact same conversation context
+                # Submit tool outputs back through the extra_body parameter array
                 response = openai_client.responses.create(
-                    conversation_id=conversation.id,
-                    agent_reference={
-                        "id": supervisor_id,
-                        "name": "Masonic-Ecosystem-Supervisor",
-                        "type": "agent_reference"
-                    },
-                    tool_outputs=tool_outputs
+                    model="gpt-5-mini",
+                    input="Synthesize the gathered metrics.",
+                    extra_body={
+                        "agent_reference": {
+                            "id": supervisor_id,
+                            "name": "Masonic-Ecosystem-Supervisor",
+                            "type": "agent_reference"
+                        },
+                        "tool_outputs": tool_outputs
+                    }
                 )
 
             print("\n🏆 --- UNIFIED MULTI-AGENT SYNTHESIS RESPONSE --- 🏆\n")
-            print(getattr(response, "output_text", response.choices.message.content if hasattr(response, 'choices') else str(response)))
+            print(getattr(response, "output_text", response.choices[0].message.content if hasattr(response, 'choices') else str(response)))
             print("\n===========================================")
             
         sys.exit(0)
