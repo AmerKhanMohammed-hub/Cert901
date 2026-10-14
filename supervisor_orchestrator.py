@@ -3,6 +3,7 @@ import sys
 import json
 from azure.identity import DefaultAzureCredential
 from azure.ai.projects import AIProjectClient
+from azure.ai.projects.models import PromptAgentDefinition
 
 # Hardcoded reference to your verified cloud worker GUID entries
 WORKER_MAP = {
@@ -15,13 +16,14 @@ def execute_supervisor_workflow():
     supervisor_id = os.getenv("AZURE_AI_AGENT_ID")
 
     if not project_endpoint or not supervisor_id:
-        print("❌ Error: Missing required environment variables.")
+        print("❌ Error: Missing required environment variables (AZURE_AI_PROJECT_ENDPOINT or AZURE_AI_AGENT_ID).")
         sys.exit(1)
 
     print("🔐 Authenticating identity via secure cloud credential bridge...")
     credential = DefaultAzureCredential()
     
     try:
+        # 1. Initialize the main project client
         project_client = AIProjectClient(endpoint=project_endpoint, credential=credential)
         print("✅ Connected to Microsoft Foundry Control Plane.")
 
@@ -57,12 +59,23 @@ def execute_supervisor_workflow():
             }
         ]
 
-        print(f"👑 Attaching dynamic routing function capabilities to Supervisor (ID: {supervisor_id})...")
-        project_client.agents.update_agent(
-            assistant_id=supervisor_id,
-            tools=tools_definition
+        print(f"👑 Attaching dynamic routing function capabilities to Supervisor via Immutable Versioning...")
+        # Production syntax maps agent structural updates through create_version
+        project_client.agents.create_version(
+            agent_name="Masonic-Ecosystem-Supervisor",
+            definition=PromptAgentDefinition(
+                model="gpt-5-mini",
+                instructions=(
+                    "You are the master Orchestrator Supervisor Agent. You delegate tasks to your specialized workers "
+                    "by executing function calls. When a user asks a question, determine which function tool is "
+                    "required, make the tool call, and synthesize the output data into clean markdown format."
+                ),
+                tools=tools_definition
+            )
         )
+        print("👑 Supervisor agent template successfully synchronized with runtime function schemas.")
 
+        # 2. Enter the OpenAI execution layer for threads and routing loops
         with project_client.get_openai_client() as openai_client:
             print("🧵 Initialising multi-agent interaction thread...")
             thread = openai_client.beta.threads.create()
@@ -107,10 +120,14 @@ def execute_supervisor_workflow():
                             
                             # Execute an isolated sub-run directly against the designated worker agent
                             sub_thread = openai_client.beta.threads.create()
+                            
+                            # Determine payload input parameter strings
+                            worker_query = arguments.get("query") or arguments.get("city") or "Extract structural data targets."
+                            
                             openai_client.beta.threads.messages.create(
                                 thread_id=sub_thread.id, 
                                 role="user", 
-                                content=arguments.get("query") or arguments.get("city")
+                                content=worker_query
                             )
                             sub_run = openai_client.beta.threads.runs.create_and_poll(
                                 thread_id=sub_thread.id, assistant_id=target_worker_id
@@ -118,7 +135,14 @@ def execute_supervisor_workflow():
                             
                             # Fetch what the worker found in its database
                             worker_messages = openai_client.beta.threads.messages.list(thread_id=sub_thread.id)
-                            worker_output = worker_messages.data[0].content[0].text.value
+                            
+                            # Safely parse text block content values from response arrays
+                            worker_output = "No data payload returned."
+                            if worker_messages.data:
+                                latest_msg = worker_messages.data[0]
+                                if latest_msg.content and hasattr(latest_msg.content[0], 'text'):
+                                    worker_output = latest_msg.content[0].text.value
+                            
                             print(f"   👤 [WORKER RESPONSE]: Captured payload data successfully.")
                             
                             tool_outputs.append({
@@ -138,7 +162,8 @@ def execute_supervisor_workflow():
             # --- DISPLAY FINAL SYNTHESIS ---
             messages = openai_client.beta.threads.messages.list(thread_id=thread.id)
             print("\n🏆 --- UNIFIED MULTI-AGENT SYNTHESIS RESPONSE --- 🏆\n")
-            print(messages.data[0].content[0].text.value)
+            if messages.data:
+                print(messages.data[0].content[0].text.value)
             print("\n===========================================")
             
         sys.exit(0)
@@ -148,4 +173,4 @@ def execute_supervisor_workflow():
         sys.exit(1)
 
 if __name__ == "__main__":
-    execute_supervisor_workflow()
+    execute_workflow = execute_supervisor_workflow()
